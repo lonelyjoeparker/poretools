@@ -30,6 +30,8 @@ def run_subtool(parser, args):
         import occupancy as submodule
     elif args.command == 'qualdist':
         import qualdist as submodule
+    elif args.command == 'qualpos':
+        import qual_v_pos as submodule
     elif args.command == 'readstats':
         import readstats as submodule
     elif args.command == 'stats':
@@ -46,6 +48,8 @@ def run_subtool(parser, args):
         import yield_plot as submodule
     elif args.command == 'index':
         import index as submodule
+    elif args.command == 'organise':
+        import organise as submodule
 
     # run the chosen submodule.
     submodule.run(parser, args)
@@ -100,7 +104,7 @@ def main():
                               metavar='STRING',
                               choices=['all', 'fwd', 'rev', '2D', 'fwd,rev'],
                               default='all',
-                              help='Which type of FASTA entries should be reported? Def.=all')
+                              help='Which type of FASTQ entries should be reported? Def.=all')
     parser_fastq.add_argument('--start',
                               dest='start_time',
                               default=None,
@@ -115,7 +119,12 @@ def main():
                               dest='min_length',
                               default=0,
                               type=int,
-                              help=('Minimum read length for FASTA entry to be reported.'))
+                              help=('Minimum read length for FASTQ entry to be reported.'))
+    parser_fastq.add_argument('--max-length',
+                              dest='max_length',
+                              default=-1,
+                              type=int,
+                              help=('Maximum read length for FASTQ entry to be reported.'))                          
     parser_fastq.add_argument('--high-quality',
                               dest='high_quality',
                               default=False,
@@ -162,6 +171,11 @@ def main():
                               default=0,
                               type=int,
                               help=('Minimum read length for FASTA entry to be reported.'))
+    parser_fasta.add_argument('--max-length',
+                              dest='max_length',
+                              default=-1,
+                              type=int,
+                              help=('Maximum read length for FASTA entry to be reported.'))                          
     parser_fasta.add_argument('--high-quality',
                               dest='high_quality',
                               default=False,
@@ -232,7 +246,7 @@ def main():
                              dest='theme_bw',
                              default=False,
                              action='store_true',
-                             help="Use the ggplot2 black and white theme.")
+                             help="Use a black and white theme.")
     parser_hist.add_argument('--watch',
                              dest='watch',
                              default=False,
@@ -255,7 +269,7 @@ def main():
                               help=('Report pre-basecalled events'))     
     parser_events.set_defaults(func=run_subtool)
 
-    
+
     ###########
     # readstats
     ###########
@@ -297,8 +311,12 @@ def main():
                                         help='Return run metadata such as ASIC ID and temperature from a set of FAST5 files')
     parser_metadata.add_argument('files', metavar='FILES', nargs='+',
                              help='The input FAST5 files.')
+    parser_metadata.add_argument('--read',
+                              dest='read',
+                              default=False,
+                              action='store_true',
+                              help=('Report read level metadata'))      
     parser_metadata.set_defaults(func=run_subtool)
-
     
     #########
     # index
@@ -318,6 +336,61 @@ def main():
     parser_qualdist.add_argument('files', metavar='FILES', nargs='+',
                              help='The input FAST5 files.')
     parser_qualdist.set_defaults(func=run_subtool)
+
+
+
+    ##########
+    # qual vs. position
+    ##########
+    parser_qualpos = subparsers.add_parser('qualpos',
+                                        help='Get the qual score distribution over positions in reads')
+    parser_qualpos.add_argument('files', metavar='FILES', nargs='+',
+                             help='The input FAST5 files.')
+    parser_qualpos.set_defaults(func=run_subtool)
+    parser_qualpos.add_argument('--min-length',
+                              dest='min_length',
+                              default=0,
+                              type=int,
+                              help=('Minimum read length to be included in analysis.'))
+    parser_qualpos.add_argument('--max-length',
+                              dest='max_length',
+                              default=1000000000,
+                              type=int,
+                              help=('Maximum read length to be included in analysis.'))
+    parser_qualpos.add_argument('--bin-width',
+                              dest='bin_width',
+                              default=1000,
+                              type=int,
+                              help=('The width of bins (default: 1000 bp).'))
+    parser_qualpos.add_argument('--type',
+                              dest='type',
+                              metavar='STRING',
+                              choices=['all', 'fwd', 'rev', '2D', 'fwd,rev'],
+                              default='all',
+                              help='Which type of reads should be analyzed? Def.=all, choices=[all, fwd, rev, 2D, fwd,rev]')
+    parser_qualpos.add_argument('--start',
+                              dest='start_time',
+                              default=None,
+                              type=int,
+                              help='Only analyze reads from after start timestamp')
+    parser_qualpos.add_argument('--end',
+                              dest='end_time',
+                              default=None,
+                              type=int,
+                              help='Only analyze reads from before end timestamp')
+    parser_qualpos.add_argument('--high-quality',
+                              dest='high_quality',
+                              default=False,
+                              action='store_true',
+                              help='Only analyze reads with more complement events than template.')
+
+    parser_qualpos.add_argument('--saveas',
+                             dest='saveas',
+                             metavar='STRING',
+                             help='''Save the plot to a file named filename.extension (e.g. pdf, jpg)''',
+                             default=None)
+
+
 
 
     ##########
@@ -358,7 +431,7 @@ def main():
                              dest='theme_bw',
                              default=False,
                              action='store_true',
-                             help="Use the ggplot2 black and white theme.")
+                             help="Use a black and white theme.")
 
     parser_squiggle.set_defaults(func=run_subtool)
 
@@ -393,12 +466,7 @@ def main():
                              dest='theme_bw',
                              default=False,
                              action='store_true',
-                             help="Use the ggplot2 black and white theme.")
-    parser_yield_plot.add_argument('--extrapolate',
-                             dest='extrapolate',
-                             metavar='INTEGER',
-                             default=0,
-                             help="Fit a curve and extrapolate to n hours")
+                             help="Use a black and white theme.")
     parser_yield_plot.add_argument('--skip',
                              dest='skip',
                              metavar='INTEGER',
@@ -410,7 +478,7 @@ def main():
                              metavar='STRING',
                              help='Save the data frame used to construct plot to a file.',
                              default=None)
-                             
+
     parser_yield_plot.set_defaults(func=run_subtool)
 
     ############
@@ -432,8 +500,24 @@ def main():
                              help='The type of plot to generate',
                              default='read_count')
 
+    ##########
+    # organise
+    ##########
 
-    parser_occupancy.set_defaults(func=run_subtool)
+    parser_organise = subparsers.add_parser('organise',
+                               help='Move FAST5 files into a useful folder hierarchy')
+    parser_organise.add_argument('files', metavar='FILES', nargs='+',
+                               help='The input FAST5 files.')
+    parser_organise.add_argument('dest',
+                               metavar='STRING',
+                               help='The destination directory.')
+    parser_organise.add_argument('--copy',
+                               default=False,
+                               action='store_true',
+                               dest='copy', 
+                               help='Make a copy of files instead of moving')
+
+    parser_organise.set_defaults(func=run_subtool)
 
     #######################################################
     # parse the args and call the selected function

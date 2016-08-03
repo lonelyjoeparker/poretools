@@ -4,7 +4,6 @@ import glob
 import tarfile
 import shutil
 import h5py
-from watchdog.events import RegexMatchingEventHandler
 
 #logging
 import logging
@@ -17,6 +16,7 @@ from Event import Event
 
 fastq_paths = {
   'closed' : {},
+  'r9rnn' :         { 'template' : '/Analyses/Basecall_RNN_1D_%03d/BaseCalled_template'},
   'metrichor1.16' : { 'template' : '/Analyses/Basecall_1D_%03d/BaseCalled_template',
                       'complement' : '/Analyses/Basecall_1D_%03d/BaseCalled_complement',
                       'twodirections' : '/Analyses/Basecall_2D_%03d/BaseCalled_2D',
@@ -37,7 +37,7 @@ FAST5SET_TARBALL = 3
 PORETOOLS_TMPDIR = '.poretools_tmp'
 
 
-class Fast5DirHandler(RegexMatchingEventHandler):
+class Fast5DirHandler(object):
 
     patterns = ["*.fast5"]
 
@@ -212,7 +212,7 @@ class Fast5File(object):
 			self.hdf5file = h5py.File(self.filename, 'r')
 			return True
 		except Exception, e:
-			logger.warning("Exception:Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
+			logger.warning("Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
 			return False
 
 	def guess_version(self):
@@ -220,23 +220,21 @@ class Fast5File(object):
 		Try and guess the location of template/complement blocks
 		"""
 		try:
+			self.hdf5file["/Analyses/Basecall_RNN_1D_%03d/BaseCalled_template" % (self.group)]
+			return 'r9rnn'
+		except KeyError:
+			pass
+
+		try:
 			self.hdf5file["/Analyses/Basecall_2D_%03d/BaseCalled_template" % (self.group)]
 			return 'classic'
 		except KeyError:
-			logger.warning("KeyError:Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
-			pass
-		except AttributeError:
-			logger.warning("AttributeError:Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
 			pass
 
 		try:
 			self.hdf5file["/Analyses/Basecall_1D_%03d/BaseCalled_template" % (self.group)]
 			return 'metrichor1.16'
 		except KeyError:
-			logger.warning("KeyError:Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
-			pass
-		except AttributeError:
-			logger.warning("AttributeError:Cannot open file: %s. Perhaps it is corrupt? Moving on.\n" % self.filename)
 			pass
 
 		return 'prebasecalled'
@@ -405,7 +403,7 @@ class Fast5File(object):
 			self.have_metadata = True
 
 		try:
-			return self.keyinfo['tracking_id'].attrs['exp_start_time']
+			return int(self.keyinfo['tracking_id'].attrs['exp_start_time'])
 		except:
 			return None
 
@@ -500,7 +498,7 @@ class Fast5File(object):
 			self.have_metadata = True
 
 		try:
-			return self.keyinfo['tracking_id'].attrs['version_name']
+			return self.keyinfo['context_tags'].attrs['version_name']
 		except:
 			return None
 
@@ -586,13 +584,49 @@ class Fast5File(object):
 			self._get_metadata()
 			self.have_metadata = True
 
+        def get_host_name(self):
+                """
+                Return the MinKNOW host computer name.
+                """
+                if self.have_metadata is False:
+                        self._get_metadata()
+                        self.have_metadata = True
+
+                try:
+                        return self.keyinfo['tracking_id'].attrs['hostname']
+                except:
+                        return None
+
+                if self.have_metadata is False:
+                        self._get_metadata()
+                        self.have_metadata = True
+
 	def get_device_id(self):
 		"""
 		Return the flowcell's device id.
 		"""
+
+                if self.have_metadata is False:
+                        self._get_metadata()
+                        self.have_metadata = True
+
 		try:
 			return self.keyinfo['tracking_id'].attrs['device_id']
 		except:
+			return None
+
+	def get_sample_name(self):
+		"""
+		Return the user supplied sample name
+		"""
+
+                if self.have_metadata is False:
+                        self._get_metadata()
+                        self.have_metadata = True
+
+		try:
+			return self.keyinfo['context_tags'].attrs['user_filename_input']
+		except Exception, e:
 			return None
 
 
